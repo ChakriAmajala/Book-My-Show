@@ -19,18 +19,17 @@ pipeline {
                 sh 'ls -la'  // Verify files after checkout
             }
         }
-        stage('SonarQube Analysis') {
-            steps {
-                withSonarQubeEnv('sonar-scanner') {
-                    sh ''' 
-                    $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName=BMS \
-                    -Dsonar.projectKey=BMS 
-                    '''
-                }
-            }
+stage('SonarQube Analysis') {
+    steps {
+        withSonarQubeEnv('sonar-scanner') {
+            sh ''' 
+            $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName=BMS \
+            -Dsonar.projectKey=BMS 
+            '''
         }
-
-        stage('Install Dependencies') {
+    }
+}
+    stage('Install Dependencies') {
             steps {
                 sh '''
                 cd bookmyshow-app
