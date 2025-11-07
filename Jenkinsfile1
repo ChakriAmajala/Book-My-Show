@@ -21,7 +21,7 @@ pipeline {
         }
 stage('SonarQube Analysis') {
     steps {
-        withSonarQubeEnv('sonar-scanner') {
+        withSonarQubeEnv('sonar-server') {
             sh ''' 
             $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName=BMS \
             -Dsonar.projectKey=BMS 
@@ -45,41 +45,35 @@ stage('SonarQube Analysis') {
             }
         }
 
-        stage('Docker Build & Push') {
-            steps {
-                script {
-                    withDockerRegistry(credentialsId: 'docker-cred', toolName: 'docker') {
-                        sh ''' 
-                        echo "Building Docker image..."
-                        docker build --no-cache -t docker:latest -f bookmyshow-app/Dockerfile bookmyshow-app
+stage('Docker Build & Push') {
+    steps {
+        script {
+            withDockerRegistry(credentialsId: 'docker-cred', toolName: 'docker') {
+                sh '''
+                echo "Building Docker image..."
+                docker build --no-cache -t chakriamajaladocker/bookmyshow:latest -f bookmyshow-app/Dockerfile bookmyshow-app
 
-                        echo "Pushing Docker image to registry..."
-                        docker push docker:latest
-                        '''
-                    }
-                }
-            }
-        }
-        stage('Deploy to Container') {
-            steps {
-                sh ''' 
-                echo "Stopping and removing old container..."
-                docker stop bms || true
-                docker rm bms || true
-
-                echo "Running new container on port 3000..."
-                docker run -d --restart=always --name bms -p 3000:3000 chakripro:latest
-
-                echo "Checking running containers..."
-                docker ps -a
-
-                echo "Fetching logs..."
-                sleep 5  # Give time for the app to start
-                docker logs bms
+                echo "Pushing Docker image to Docker Hub..."
+                docker push chakriamajaladocker/bookmyshow:latest
                 '''
             }
         }
     }
+}
+
+stage('Deploy to Container') {
+    steps {
+        sh '''
+        docker stop bms || true
+        docker rm bms || true
+        docker run -d --restart=always --name bms -p 3000:3000 chakriamajaladocker/bookmyshow:latest
+        docker ps -a
+        sleep 5
+        docker logs bms
+        '''
+    }
+}
+
     post {
         always {
             emailext attachLog: true,
