@@ -7,8 +7,9 @@ pipeline {
     environment {
         SCANNER_HOME = tool 'sonar-scanner'
         AWS_REGION = 'ap-south-1'
-        EKS_CLUSTER_NAME = 'chakri2316-ng-382d3ddf'
-    }
+        EKS_CLUSTER_NAME = 'chakri2316'
+        KUBECONFIG = credentials ('aws-creds')
+}
 
     stages {
         stage('Clean Workspace') {
@@ -69,7 +70,7 @@ pipeline {
         }
 stage('Deploy to EKS Cluster') {
     steps {
-        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-cred']]) {
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
             script {
                 sh '''
                 echo "Verifying AWS credentials..."
