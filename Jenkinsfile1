@@ -28,13 +28,13 @@ pipeline {
 
 stage('SonarQube Analysis') {
       steps {
-        withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_TOKEN')]) {
+        withCredentials([string(credentialsId: 'sonarr', variable: 'SONAR_TOKEN')]) {
           sh '''
             echo "Using Sonar host: $SONAR_HOST_URL"
             /var/lib/jenkins/tools/hudson.plugins.sonar.SonarRunnerInstallation/sonar-scanner/bin/sonar-scanner \
               -Dsonar.projectKey=BMS \
               -Dsonar.projectName=BMS \
-              -Dsonar.host.url="$SONAR_HOST_URL" \
+              -Dsonar.host.url="http://3.107.243.117:9090" \
               -Dsonar.login="$SONAR_TOKEN"
           '''
         }
