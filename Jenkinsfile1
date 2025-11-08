@@ -81,7 +81,7 @@ stage('Deploy to Container') {
                 docker rm bms || true
 
                 echo "Running new container on port 3000..."
-                docker run -d --restart=always --name bms -p 3000:3000 chakriamajaladocker/bookmyshow:latest
+                docker run -d --restart=always --name bms -p 3000:80 chakriamajaladocker/bookmyshow:latest
 
 
                 echo "Checking running containers..."
