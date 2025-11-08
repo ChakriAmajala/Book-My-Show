@@ -67,52 +67,30 @@ pipeline {
                 }
             }
         }
-
-        stage('Deploy to EKS Cluster') {
-            steps {
-                script {
-                    sh '''
-                    echo "Verifying AWS credentials..."
-                    aws sts get-caller-identity
-
-                    echo "Configuring kubectl for EKS cluster..."
-                    aws eks update-kubeconfig --name $EKS_CLUSTER_NAME --region $AWS_REGION
-
-                    echo "Verifying kubeconfig..."
-                    kubectl config view
-
-                    echo "Deploying application to EKS..."
-                    kubectl apply -f deployment.yml
-                    kubectl apply -f service.yml
-
-                    echo "Verifying deployment..."
-                    kubectl get pods
-                    kubectl get svc
-                    '''
-                }
-            }
-        }
-
-        stage('Deploy to Container') {
-            steps {
+stage('Deploy to EKS Cluster') {
+    steps {
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-cred']]) {
+            script {
                 sh '''
-                echo "Stopping old container if exists..."
-                docker stop bms || true
-                docker rm bms || true
+                echo "Verifying AWS credentials..."
+                aws sts get-caller-identity
 
-                echo "Running latest container..."
-                docker run -d --restart=always --name bms -p 3000:3000 chakriamajaladocker/bookmyshow:latest
+                echo "Configuring kubectl for EKS cluster..."
+                aws eks update-kubeconfig --name $EKS_CLUSTER_NAME --region $AWS_REGION
 
-                echo "Verifying container status..."
-                docker ps -a
+                echo "Deploying application to EKS..."
+                kubectl apply -f deployment.yml
+                kubectl apply -f service.yml
 
-                echo "Showing logs..."
-                sleep 5
-                docker logs bms
+                echo "Verifying deployment..."
+                kubectl get pods
+                kubectl get svc
                 '''
             }
         }
     }
+}
+
 
     post {
         always {
