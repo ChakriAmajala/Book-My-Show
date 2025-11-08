@@ -8,7 +8,7 @@ pipeline {
     environment {
         SCANNER_HOME = tool 'sonar-scanner'
         AWS_REGION = 'ap-south-1'
-        EKS_CLUSTER_NAME = 'chakri-p16'
+        EKS_CLUSTER_NAME = 'new'
     }
 
     stages {
