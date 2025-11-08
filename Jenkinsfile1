@@ -73,28 +73,23 @@ stage('SonarQube Analysis') {
                 }
             }
         }
-
-        stage('Deploy to EKS Cluster') {
+stage('Deploy to Container') {
             steps {
-                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
-                    script {
-                        sh '''
-                        echo "✅ Verifying AWS credentials..."
-                        aws sts get-caller-identity
+                sh ''' 
+                echo "Stopping and removing old container..."
+                docker stop bms || true
+                docker rm bms || true
 
-                        echo "🔧 Configuring kubectl for EKS cluster..."
-                        aws eks update-kubeconfig --name $EKS_CLUSTER_NAME --region $AWS_REGION
+                echo "Running new container on port 3000..."
+                docker run -d --restart=always --name bms -p 3000:3000 bms:latest
 
-                        echo "🚀 Deploying application to EKS..."
-                        kubectl apply -f deployment.yml
-                        kubectl apply -f service.yml
+                echo "Checking running containers..."
+                docker ps -a
 
-                        echo "✅ Verifying deployment..."
-                        kubectl get pods
-                        kubectl get svc
-                        '''
-                    }
-                }
+                echo "Fetching logs..."
+                sleep 5  # Give time for the app to start
+                docker logs bms
+                '''
             }
         }
     }
