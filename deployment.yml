@@ -15,7 +15,7 @@ spec:
         app: bms
     spec:
       containers:
-      - name: bms-container
-        image: kastrov/bms:latest  # Replace with your Docker image
+      - name: chakri-container
+        image: chakriamajaladocker/bookmyshow  # Replace with your Docker image
         ports:
         - containerPort: 3000  # Replace with the port your app runs on
