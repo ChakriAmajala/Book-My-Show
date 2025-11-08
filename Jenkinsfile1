@@ -70,31 +70,49 @@ pipeline {
 
         stage('Deploy to EKS Cluster') {
             steps {
-                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
-                    script {
-                        sh '''
-                        echo "✅ Verifying AWS credentials..."
-                        aws sts get-caller-identity
+                script {
+                    sh '''
+                    echo "Verifying AWS credentials..."
+                    aws sts get-caller-identity
 
-                        echo "🔧 Configuring kubectl for EKS cluster..."
-                        aws eks update-kubeconfig --name $EKS_CLUSTER_NAME --region $AWS_REGION
+                    echo "Configuring kubectl for EKS cluster..."
+                    aws eks update-kubeconfig --name $EKS_CLUSTER_NAME --region $AWS_REGION
 
-                        echo "🔍 Verifying kubeconfig..."
-                        kubectl config current-context
+                    echo "Verifying kubeconfig..."
+                    kubectl config view
 
-                        echo "🚀 Deploying application to EKS..."
-                        kubectl apply -f deployment.yml
-                        kubectl apply -f service.yml
+                    echo "Deploying application to EKS..."
+                    kubectl apply -f deployment.yml
+                    kubectl apply -f service.yml
 
-                        echo "✅ Verifying deployment..."
-                        kubectl get pods
-                        kubectl get svc
-                        '''
-                    }
+                    echo "Verifying deployment..."
+                    kubectl get pods
+                    kubectl get svc
+                    '''
                 }
             }
         }
-    }  // ✅ Properly closing 'stages' block here
+
+        stage('Deploy to Container') {
+            steps {
+                sh '''
+                echo "Stopping old container if exists..."
+                docker stop bms || true
+                docker rm bms || true
+
+                echo "Running latest container..."
+                docker run -d --restart=always --name bms -p 3000:3000 chakriamajaladocker/bookmyshow:latest
+
+                echo "Verifying container status..."
+                docker ps -a
+
+                echo "Showing logs..."
+                sleep 5
+                docker logs bms
+                '''
+            }
+        }
+    }
 
     post {
         always {
