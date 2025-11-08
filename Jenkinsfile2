@@ -1,112 +1,149 @@
 pipeline {
-    agent any
-    tools {
-        jdk 'jdk17'
-        nodejs 'node23'
+  agent any
+  tools {
+    jdk 'jdk17'
+    nodejs 'node23'
+  }
+
+  environment {
+    SCANNER_HOME = tool 'sonar-scanner'
+    AWS_REGION = 'ap-south-1'
+    EKS_CLUSTER_NAME = 'new1'
+    SONAR_HOST_URL = 'http://3.107.243.117:9090/'
+    IMAGE_NAME = "chakriamajaladocker/bookmyshow:latest"
+    K8S_NAMESPACE = "default"
+  }
+
+  stages {
+    stage('Clean Workspace') {
+      steps { cleanWs() }
     }
 
-    environment {
-        SCANNER_HOME = tool 'sonar-scanner'
-        AWS_REGION = 'ap-south-1'
-        EKS_CLUSTER_NAME = 'new1'
-        SONAR_HOST_URL = 'http://3.107.243.117:9090/'
+    stage('Checkout from Git') {
+      steps {
+        git branch: 'main', url: 'https://github.com/ChakriAmajala/Book-My-Show.git'
+        sh 'ls -la'
+      }
     }
 
-    stages {
-        stage('Clean Workspace') {
-            steps {
-                cleanWs()
-            }
-        }
-
-        stage('Checkout from Git') {
-            steps {
-                git branch: 'main', url: 'https://github.com/ChakriAmajala/Book-My-Show.git'
-                sh 'ls -la'
-            }
-        }
-
-stage('SonarQube Analysis') {
+    stage('SonarQube Analysis') {
       steps {
         withCredentials([string(credentialsId: 'sonarr', variable: 'SONAR_TOKEN')]) {
           sh '''
             echo "Using Sonar host: $SONAR_HOST_URL"
-            /var/lib/jenkins/tools/hudson.plugins.sonar.SonarRunnerInstallation/sonar-scanner/bin/sonar-scanner \
+            ${SCANNER_HOME}/bin/sonar-scanner \
               -Dsonar.projectKey=BMS \
               -Dsonar.projectName=BMS \
-              -Dsonar.host.url="http://3.107.243.117:9090" \
+              -Dsonar.host.url="$SONAR_HOST_URL" \
               -Dsonar.login="$SONAR_TOKEN"
           '''
         }
       }
     }
 
-        stage('Install Dependencies') {
-            steps {
-                sh '''
-                cd bookmyshow-app
-                ls -la
-                if [ -f package.json ]; then
-                    rm -rf node_modules package-lock.json
-                    npm install
-                else
-                    echo "Error: package.json not found in bookmyshow-app!"
-                    exit 1
-                fi
-                '''
-            }
-        }
-
-        stage('Docker Build & Push') {
-            steps {
-                script {
-                    withDockerRegistry(credentialsId: 'docker-cred', toolName: 'docker') {
-                        sh '''
-                        echo "Building Docker image..."
-                        docker build --no-cache -t chakriamajaladocker/bookmyshow:latest -f bookmyshow-app/Dockerfile bookmyshow-app
-
-                        echo "Pushing Docker image to Docker Hub..."
-                        docker push chakriamajaladocker/bookmyshow:latest
-                        '''
-                    }
-                }
-            }
-        }
-
-stage('Deploy to EKS Cluster') {
-            steps {
-                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
-                    script {
-                        sh '''
-                        echo "✅ Verifying AWS credentials..."
-                        aws sts get-caller-identity
-
-                        echo "🔧 Configuring kubectl for EKS cluster..."
-                        aws eks update-kubeconfig --name $EKS_CLUSTER_NAME --region $AWS_REGION
-
-                        echo "🚀 Deploying application to EKS..."
-                        kubectl apply -f deployment.yml
-                        kubectl apply -f service.yml
-
-                        echo "✅ Verifying deployment..."
-                        kubectl get pods
-                        kubectl get svc
-                        '''
-                    }
-                }
-            }
-        }
+    stage('Install Dependencies') {
+      steps {
+        sh '''
+          cd bookmyshow-app
+          if [ -f package.json ]; then
+            rm -rf node_modules package-lock.json
+            npm install
+          else
+            echo "Error: package.json not found in bookmyshow-app!"
+            exit 1
+          fi
+        '''
+      }
     }
 
-    post {
-        always {
-            emailext attachLog: true,
-                subject: "'${currentBuild.result}'",
-                body: "Project: ${env.JOB_NAME}<br/>" +
-                      "Build Number: ${env.BUILD_NUMBER}<br/>" +
-                      "URL: ${env.BUILD_URL}<br/>",
-                to: 'chakridevopsengineer@gmail.com',
-                attachmentsPattern: 'trivyfs.txt,trivyimage.txt'
+    stage('Docker Build & Push') {
+      steps {
+        script {
+          withDockerRegistry(credentialsId: 'docker-cred', url: 'https://index.docker.io/v1/') {
+            sh """
+              echo "Building Docker image..."
+              docker build --no-cache -t ${IMAGE_NAME} -f bookmyshow-app/Dockerfile bookmyshow-app
+
+              echo "Pushing Docker image to Docker Hub..."
+              docker push ${IMAGE_NAME}
+            """
+          }
         }
+      }
     }
+
+    stage('Deploy to EKS Cluster') {
+      steps {
+        // This binds aws-creds to the usual AWS env vars
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
+          sh '''
+            echo "✅ Verifying AWS credentials..."
+            aws sts get-caller-identity
+
+            echo "🔧 Configuring kubectl for EKS cluster..."
+            aws eks update-kubeconfig --name $EKS_CLUSTER_NAME --region $AWS_REGION
+
+            echo "🚀 Deploying application to EKS..."
+            kubectl apply -f deployment.yml
+            kubectl apply -f service.yml
+
+            echo "✅ Verifying deployment..."
+            kubectl -n ${K8S_NAMESPACE} get pods -o wide || true
+            kubectl -n ${K8S_NAMESPACE} get svc || true
+          '''
+        }
+      }
+    }
+
+    stage('Create / Update Ingress') {
+      when { expression { return true } }
+      steps {
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
+          sh '''
+            echo "🔧 Ensure kubeconfig for EKS cluster..."
+            aws eks update-kubeconfig --name $EKS_CLUSTER_NAME --region $AWS_REGION
+
+            echo "Creating ingress manifest..."
+            cat > ingress.yml <<'ING'
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: bms-ingress
+  namespace: ${K8S_NAMESPACE}
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: bms-service
+            port:
+              number: 3000
+ING
+
+            echo "Applying ingress..."
+            kubectl apply -f ingress.yml
+
+            echo "Wait for ingress (if using nginx-ingress / ALB controller, check resources)..."
+            kubectl -n ${K8S_NAMESPACE} get ingress bms-ingress -o yaml || true
+          '''
+        }
+      }
+    }
+
+  } // stages
+
+  post {
+    always {
+      emailext attachLog: true,
+        subject: "'${currentBuild.result}'",
+        body: "Project: ${env.JOB_NAME}<br/>Build Number: ${env.BUILD_NUMBER}<br/>URL: ${env.BUILD_URL}<br/>",
+        to: 'chakridevopsengineer@gmail.com',
+        attachmentsPattern: 'trivyfs.txt,trivyimage.txt'
+    }
+  }
 }
