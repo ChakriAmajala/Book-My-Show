@@ -40,14 +40,14 @@ stage('SonarQube Analysis') {
         }
       }
     }
-stage('Quality Gate') {
-            steps {
-                script {
-                    waitForQualityGate abortPipeline: false, credentialsId: 'Sonarr'
-                }
-            }
-        }
 
+stage('Quality Gate') {
+  steps {
+    timeout(time: 2, unit: 'MINUTES') {
+      waitForQualityGate abortPipeline: true
+    }
+  }
+}
         stage('Install Dependencies') {
             steps {
                 sh '''
