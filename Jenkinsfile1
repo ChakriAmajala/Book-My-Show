@@ -9,6 +9,7 @@ pipeline {
         SCANNER_HOME = tool 'sonar-scanner'
         AWS_REGION = 'ap-south-1'
         EKS_CLUSTER_NAME = 'new'
+        SONAR_HOST_URL = 'http://3.107.243.117:9090/'
     }
 
     stages {
