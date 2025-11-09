@@ -9,8 +9,8 @@ pipeline {
   environment {
     SCANNER_HOME = tool 'sonar-scanner'
     AWS_REGION = 'ap-southeast-2'
-    EKS_CLUSTER_NAME = 'new'
-    SONAR_HOST_URL = 'http://13.211.163.74:9090/'
+    EKS_CLUSTER_NAME = 'chakri'
+    SONAR_HOST_URL = 'http://3.26.209.50:9090/'
     IMAGE_NAME = "chakriamajaladocker/bookmyshow:latest"
     K8S_NAMESPACE = "bms-namespace"
   }
