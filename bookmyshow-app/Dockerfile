@@ -13,6 +13,7 @@ EXPOSE 3000
 
 ENV NODE_OPTIONS=--openssl-legacy-provider
 ENV PORT=3000
-ENV HOST=0.0.0.0   # ✅ Keep this — allows container to listen on all interfaces
+# ✅ This makes React server listen on all interfaces (needed for Kubernetes)
+ENV HOST=0.0.0.0
 
 CMD ["npm", "start"]
