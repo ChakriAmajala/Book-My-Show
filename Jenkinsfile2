@@ -119,7 +119,6 @@ metadata:
     kubernetes.io/ingress.class: "nginx"
 spec:
   rules:
-  - host: bms.chakridevops.com
     http:
       paths:
       - path: /chakri
@@ -129,8 +128,6 @@ spec:
             name: book1-service
             port:
               number: 80   # ✅ Must match service port (NOT 3000)
-ING
-
             echo "🚀 Applying ingress..."
             kubectl get ns ${K8S_NAMESPACE} || kubectl create ns ${K8S_NAMESPACE}
             kubectl apply -f ingress.yml
