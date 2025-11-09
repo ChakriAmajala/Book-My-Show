@@ -125,7 +125,7 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: book-service
+            name: book1-service
             port:
               number: 3000
 ING
