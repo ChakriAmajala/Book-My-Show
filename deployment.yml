@@ -17,6 +17,6 @@ spec:
     spec:
       containers:
       - name: chakri-container
-        image: chakriamajaladocker/bookmyshow  # Replace with your Docker image
+        image: chakriamajaladocker/bookmyshow:latest  # ✅ Always tag your image
         ports:
-        - containerPort: 3000  # Replace with the port your app runs on
+        - containerPort: 3000
