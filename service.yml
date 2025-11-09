@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: book-service
+  name: book1-service
   namespace: bms-namespace
   labels:
     app: bms
