@@ -1,5 +1,6 @@
 pipeline {
   agent any
+
   tools {
     jdk 'jdk17'
     nodejs 'node23'
@@ -11,12 +12,14 @@ pipeline {
     EKS_CLUSTER_NAME = 'new'
     SONAR_HOST_URL = 'http://13.211.163.74:9090/'
     IMAGE_NAME = "chakriamajaladocker/bookmyshow:latest"
-    K8S_NAMESPACE = "default"
+    K8S_NAMESPACE = "bms-namespace"
   }
 
   stages {
     stage('Clean Workspace') {
-      steps { cleanWs() }
+      steps {
+        cleanWs()
+      }
     }
 
     stage('Checkout from Git') {
@@ -35,7 +38,7 @@ pipeline {
               -Dsonar.projectKey=BMS \
               -Dsonar.projectName=BMS \
               -Dsonar.host.url="$SONAR_HOST_URL" \
-              -Dsonar.login="$SONAR_TOKEN"
+              -Dsonar.token="$SONAR_TOKEN"
           '''
         }
       }
@@ -49,7 +52,7 @@ pipeline {
             rm -rf node_modules package-lock.json
             npm install
           else
-            echo "Error: package.json not found in bookmyshow-app!"
+            echo "❌ Error: package.json not found in bookmyshow-app!"
             exit 1
           fi
         '''
@@ -61,10 +64,10 @@ pipeline {
         script {
           withDockerRegistry(credentialsId: 'docker-cred', url: 'https://index.docker.io/v1/') {
             sh """
-              echo "Building Docker image..."
+              echo "🐳 Building Docker image..."
               docker build --no-cache -t ${IMAGE_NAME} -f bookmyshow-app/Dockerfile bookmyshow-app
 
-              echo "Pushing Docker image to Docker Hub..."
+              echo "📦 Pushing Docker image to Docker Hub..."
               docker push ${IMAGE_NAME}
             """
           }
@@ -74,7 +77,6 @@ pipeline {
 
     stage('Deploy to EKS Cluster') {
       steps {
-        // This binds aws-creds to the usual AWS env vars
         withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
           sh '''
             echo "✅ Verifying AWS credentials..."
@@ -84,8 +86,9 @@ pipeline {
             aws eks update-kubeconfig --name $EKS_CLUSTER_NAME --region $AWS_REGION
 
             echo "🚀 Deploying application to EKS..."
-            kubectl apply -f deployment.yml
-            kubectl apply -f service.yml
+            kubectl get ns ${K8S_NAMESPACE} || kubectl create ns ${K8S_NAMESPACE}
+            kubectl -n ${K8S_NAMESPACE} apply -f deployment.yml
+            kubectl -n ${K8S_NAMESPACE} apply -f service.yml
 
             echo "✅ Verifying deployment..."
             kubectl -n ${K8S_NAMESPACE} get pods -o wide || true
@@ -96,15 +99,17 @@ pipeline {
     }
 
     stage('Create / Update Ingress') {
-      when { expression { return true } }
       steps {
         withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
           sh '''
             echo "🔧 Ensure kubeconfig for EKS cluster..."
             aws eks update-kubeconfig --name $EKS_CLUSTER_NAME --region $AWS_REGION
 
-            echo "Creating ingress manifest..."
-            cat > ingress.yml <<'ING'
+            echo "🧾 Creating ingress manifest..."
+
+
+
+            cat > ingress.yml <<ING
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -125,25 +130,35 @@ spec:
               number: 3000
 ING
 
-            echo "Applying ingress..."
+            echo "🚀 Applying ingress..."
+            kubectl get ns ${K8S_NAMESPACE} || kubectl create ns ${K8S_NAMESPACE}
             kubectl apply -f ingress.yml
 
-            echo "Wait for ingress (if using nginx-ingress / ALB controller, check resources)..."
-            kubectl -n ${K8S_NAMESPACE} get ingress bms-ingress -o yaml || true
+            echo "✅ Verifying ingress..."
+            kubectl -n ${K8S_NAMESPACE} get ingress bms-ingress -o wide || true
           '''
         }
       }
     }
-
-  } // stages
+  }
 
   post {
-    always {
-      emailext attachLog: true,
-        subject: "'${currentBuild.result}'",
-        body: "Project: ${env.JOB_NAME}<br/>Build Number: ${env.BUILD_NUMBER}<br/>URL: ${env.BUILD_URL}<br/>",
+    success {
+      emailext (
+        subject: "✅ SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+        body: "✅ Project *${env.JOB_NAME}* build succeeded!<br>URL: ${env.BUILD_URL}",
+        to: 'chakridevopsengineer@gmail.com'
+      )
+    }
+
+    failure {
+      emailext (
+        subject: "❌ FAILURE: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+        body: "❌ Project *${env.JOB_NAME}* failed!<br>Check logs:<br>${env.BUILD_URL}",
         to: 'chakridevopsengineer@gmail.com',
-        attachmentsPattern: 'trivyfs.txt,trivyimage.txt'
+        attachLog: true
+      )
     }
   }
 }
+
