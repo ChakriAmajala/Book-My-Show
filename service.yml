@@ -1,16 +1,15 @@
-  apiVersion: v1
+apiVersion: v1
 kind: Service
 metadata:
   name: book1-service
   namespace: bms-namespace
   labels:
     app: bms
-spec:                 #clusteripthisipetttukovachu
-  type: ClusterIP      # ✅ Keep internal service (Ingress already LoadBalancer)
+spec:
+  type: ClusterIP
   selector:
     app: bms
   ports:
     - protocol: TCP
       port: 80
       targetPort: 3000
-
